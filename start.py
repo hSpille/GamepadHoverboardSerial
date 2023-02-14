@@ -64,19 +64,10 @@ if __name__ == "__main__":
             #global global_speed_left
             while True:
                 
-
-                # Calculate elapsed time
-                elapsedTime = time.time() - startTime
-                if elapsedTime < TIME_SEND:
-                    continue
-                startTime = time.time()
-                #print('Right' ,global_speed_right)
-                #print('Left' ,global_speed_left)
-
-
                 # Send commands
                 hover_serial.send_command(global_speed_left, global_speed_right)
                 print('Sending:\t Speed Left: '+str(global_speed_left)+' Speed Right: '+str(global_speed_right))
+                time.sleep(0.2)
             
 
             signal.pause()
