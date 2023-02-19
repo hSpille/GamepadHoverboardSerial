@@ -4,49 +4,54 @@ import time
 import signal
 from xbox360controller import Xbox360Controller
 
-global_speed_left = 0
-global_speed_right = 0
-global_forward = True # 
-SPEED_MAX_TEST = 300  # [-] Maximum speed for testing
-SPEED_STEP = 2  # [-] Speed step
-TIME_SEND = 0.1  # [s] Sending time interval
+global_speed = 0
+global_steer = 0
+global_fast = False # 
+SPEED_SLOW = 200  # [-] Maximum speed for testing
+SPEED_HIGH = 500
+TIME_SLEEP = 0.3  # [s] Sending time interval
 
-
-iStep = SPEED_STEP
-iTest = 0
-steer = 0
-startTime = 0
 
 
 def float_to_int(input_float):
-    return int(input_float * 200)
+    if(global_fast):
+        return int(input_float * SPEED_HIGH)
+    return int(input_float * SPEED_SLOW)
 
 def on_button_pressed(button):
-    global global_forward
-    global_forward = not global_forward
+    global global_fast
+    global_fast = not global_fast
 
 def on_trigger_moved(trigger):
-    #print('Trigger {0} moved to {1}'.format(trigger.name, trigger.value))
-    
+    #print('Trigger {0} moved to {1}'.format(trigger.name, trigger.value))    
+    global global_speed 
     if(trigger.name == 'trigger_r'):
-        global global_speed_right 
-        global_speed_right = float_to_int(trigger.value)
+        #backwards
+        global_speed = trigger.value * -1
 
     if(trigger.name == 'trigger_l'):
-        global global_speed_left 
-        global_speed_left = float_to_int(trigger.value)
+        #forward
+        global_speed = trigger.value 
+    
+def on_axis_moved(axis):
+    #print('Axis {0} moved to {1} {2}'.format(axis.name, axis.x, axis.y))
+    global global_steer
+    if(abs(axis.x) < 0.5):
+            global_steer =  0
+    else:
+        global_steer = axis.x
 
-def thread_receive_feedback():
+def convert_steering_and_speed_to_diff_drive(steering_value, speed_value):
+    # Calculate the left and right wheel speeds
+    if steering_value == 0:
+        left_speed = speed_value
+        right_speed = speed_value
+    else:
+        left_speed = (1 - abs(steering_value)) * (speed_value if steering_value > 0 else speed_value * (1 - abs(steering_value)))
+        right_speed = (1 - abs(steering_value)) * (speed_value if steering_value < 0 else speed_value * (1 - abs(steering_value)))
 
-    while True:
-
-        feedback = hover_serial.receive_feedback()
-
-        if feedback == None:
-            print('No feedback')
-            continue
-        
-        print('Receiving:\t', feedback)
+    # Return the left and right wheel speeds
+    return left_speed, right_speed
 
 
 if __name__ == "__main__":
@@ -60,14 +65,15 @@ if __name__ == "__main__":
             controller.trigger_r.when_moved = on_trigger_moved
             controller.trigger_l.when_moved = on_trigger_moved
             controller.button_a.when_pressed = on_button_pressed
-            #global global_speed_right
-            #global global_speed_left
+            controller.axis_l.when_moved = on_axis_moved
             while True:
-                
+                drive = convert_steering_and_speed_to_diff_drive(global_steer, global_speed)
                 # Send commands
-                hover_serial.send_command(global_speed_left, global_speed_right)
-                print('Sending:\t Speed Left: '+str(global_speed_left)+' Speed Right: '+str(global_speed_right))
-                time.sleep(0.2)
+                hover_serial.send_command(float_to_int(drive[0]),float_to_int(drive[1]))
+                #print('Sending Values left,rigt: ', float_to_int(drive[0]) ,float_to_int(drive[1]))
+                print('Global values' ,global_speed, global_steer)
+                time.sleep(0.3)
+
             
 
             signal.pause()
